@@ -1,112 +1,100 @@
 package projekti.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
+
+import jakarta.validation.Valid;
 import projekti.entity.Address;
 import projekti.repository.AddressRepository;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
-@RestController
-@RequestMapping("/api/addresses")
+
+@Controller
+@RequestMapping("/addresses")
 public class AddressController {
 
     @Autowired
     private AddressRepository addressRepository;
 
-    // Create a new address
-    @PostMapping
-    public ResponseEntity<?> createAddress(@RequestBody Address address) {
-        List<String> errors = validateAddress(address);
-        if (!errors.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
-        }
-        Address savedAddress = addressRepository.save(address);
-        return ResponseEntity.status(HttpStatus.CREATED).body(savedAddress);
-    }
 
-    // Get all addresses
+    // Näyttää osoitteet
     @GetMapping
-    public List<Address> getAllAddresses() {
-        return addressRepository.findAll();
+    public String listAddresses(Model model) {
+        List<Address> addresses = addressRepository.findAll();
+        model.addAttribute("addresses", addresses);
+        return "addresses";
     }
 
-    // Get an address by ID
-    @GetMapping("/{id}")
-    public ResponseEntity<Address> getAddress(@PathVariable Long id) {
-        return addressRepository.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+    // Uusi osoite
+    @GetMapping("/new")
+    public String showNewAddressForm(Model model) {
+        model.addAttribute("address", new Address()); 
+        return "newAddress"; 
     }
 
-    // Get addresses by city
-    @GetMapping("/city/{city}")
-    public List<Address> getAddressesByCity(@PathVariable String city) {
-        return addressRepository.findByCity(city);
+    // Tallenna osoite
+    @PostMapping
+    public String saveAddress(@ModelAttribute("address") @Valid Address address, BindingResult result) {
+        if (result.hasErrors()) {
+            return "newAddress"; // Validointi, jos virheitä palaa takaisin
+        }
+        addressRepository.save(address);
+        return "redirect:/addresses";
     }
 
-    // Update an address
-    @PutMapping("/{id}")
-    public ResponseEntity<?> updateAddress(@PathVariable Long id, @RequestBody Address updatedAddress) {
-        List<String> errors = validateAddress(updatedAddress);
-        if (!errors.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
+    // Osoitteen editointi
+    @GetMapping("/edit/{id}")
+    public String showEditAddressForm(@PathVariable Long id, Model model) {
+        Address address = addressRepository.findById(id).orElse(null);
+        if (address != null) {
+            model.addAttribute("address", address);
+            return "editAddress";
         }
-
-        return addressRepository.findById(id)
-                .map(existingAddress -> {
-                    existingAddress.setName(updatedAddress.getName());
-                    existingAddress.setStreet(updatedAddress.getStreet());
-                    existingAddress.setCity(updatedAddress.getCity());
-                    existingAddress.setState(updatedAddress.getState());
-                    existingAddress.setPostalCode(updatedAddress.getPostalCode());
-                    existingAddress.setEmail(updatedAddress.getEmail());
-                    Address savedAddress = addressRepository.save(existingAddress);
-                    return ResponseEntity.ok(savedAddress);
-                })
-                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+        return "redirect:/addresses"; 
     }
 
-    // Delete an address
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteAddress(@PathVariable Long id) {
-        Optional<Address> existingAddress = addressRepository.findById(id);
-    
-        if (existingAddress.isPresent()) {
-            addressRepository.delete(existingAddress.get());
-            return ResponseEntity.noContent().build(); // Return 204 No Content for successful deletion
-        } else {
-            return ResponseEntity.notFound().build(); // Return 404 Not Found if the address is not found
-        }
+    // Päivitetyt osoitteet
+    @PostMapping("/{id}")
+    public String updateAddress(@PathVariable Long id, @ModelAttribute("address") Address updatedAddress) {
+        addressRepository.findById(id).ifPresent(existingAddress -> {
+            existingAddress.setName(updatedAddress.getName());
+            existingAddress.setStreet(updatedAddress.getStreet());
+            existingAddress.setCity(updatedAddress.getCity());
+            existingAddress.setCountry(updatedAddress.getCountry());
+            existingAddress.setPostalCode(updatedAddress.getPostalCode());
+            addressRepository.save(existingAddress);
+        });
+        return "redirect:/addresses";
     }
 
-    // Manual validation method
-    private List<String> validateAddress(Address address) {
-        List<String> errors = new ArrayList<>();
-
-        if (address.getName() == null || address.getName().isEmpty() || address.getName().length() > 100) {
-            errors.add("Name must be between 1 and 100 characters.");
-        }
-        if (address.getStreet() == null || address.getStreet().isEmpty() || address.getStreet().length() > 255) {
-            errors.add("Street must be between 1 and 255 characters.");
-        }
-        if (address.getCity() == null || address.getCity().isEmpty() || address.getCity().length() > 100) {
-            errors.add("City must be between 1 and 100 characters.");
-        }
-        if (address.getState() == null || address.getState().isEmpty() || address.getState().length() > 50) {
-            errors.add("State must be between 1 and 50 characters.");
-        }
-        if (address.getPostalCode() == null || !address.getPostalCode().matches("\\d{5}")) {
-            errors.add("Postal Code must be a 5-digit number.");
-        }
-        if (address.getEmail() != null && !address.getEmail().matches("^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$")) {
-            errors.add("Email must be a valid email address.");
-        }
-
-        return errors;
+    // Osoitteen poisto
+    @GetMapping("/delete/{id}")
+    public String deleteAddress(@PathVariable Long id) {
+        addressRepository.deleteById(id);
+        return "redirect:/addresses";
     }
+
+// Osoitteiden haku
+@GetMapping("/search")
+public String searchAddresses(@RequestParam(required = false) String name,
+                               @RequestParam(required = false) String street,
+                               @RequestParam(required = false) String city,
+                               @RequestParam(required = false) String country,
+                               @RequestParam(required = false) String postalCode,
+                               Model model) {
+    List<Address> addresses = addressRepository.searchAddresses(name, street, city, country, postalCode);
+    model.addAttribute("addresses", addresses);
+    model.addAttribute("name", name);
+    model.addAttribute("street", street);
+    model.addAttribute("city", city);
+    model.addAttribute("country", country);
+    model.addAttribute("postalCode", postalCode);
+    return "addresses"; 
+}
+
 }

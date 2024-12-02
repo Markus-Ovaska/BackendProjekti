@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Edit Address</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <h1>Edit Address</h1>
+    <!-- Osoitteen haku -->
+    <form th:action="@{/addresses/{id}(id=${address.id})}" th:object="${address}" method="post">
+        <label for="name">Name:</label>
+        <input type="text" id="name" th:field="*{name}" /><br />
+
+        <label for="street">Street:</label>
+        <input type="text" id="street" th:field="*{street}" /><br />
+
+        <label for="city">City:</label>
+        <input type="text" id="city" th:field="*{city}" /><br />
+
+        <label for="country">Country:</label>
+        <input type="text" id="country" th:field="*{country}" /><br />
+
+        <label for="postalCode">Postal Code:</label>
+        <input type="text" id="postalCode" th:field="*{postalCode}" /><br />
+
+        <button type="submit">Update</button>
+    </form>
+</body>
+</html>
